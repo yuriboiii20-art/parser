@@ -1,0 +1,20 @@
+{
+  "name": "resume-parser-monorepo",
+  "version": "1.0.0",
+  "description": "Production-ready PDF Resume Parser Application built with Express.js, pdf-parse, and React 19.",
+  "scripts": {
+    "install:all": "cd server && npm install && cd ../client && npm install",
+    "start:server": "cd server && npm start",
+    "start:client": "cd client && npm run dev",
+    "test:server": "cd server && npm test"
+  },
+  "keywords": [
+    "resume-parser",
+    "express",
+    "pdf-parse",
+    "react19",
+    "tailwindcss"
+  ],
+  "author": "Antigravity AI",
+  "license": "MIT"
+}
