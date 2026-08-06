@@ -14,8 +14,8 @@ server/output/*
 !server/output/.gitkeep
 
 # Environment variables
-.env
-server/.env
+.env.example
+server/.env.example
 
 # Logs
 *.log

@@ -9,6 +9,7 @@ const os = require('os');
 const pdfParse = require('pdf-parse');
 const config = require('../config/appConfig');
 const { parseResumeText, getSampleResume } = require('../services/parserService');
+const { sanitizeResumeData } = require('../utils/privacy');
 
 // Get a writable output directory (supports Vercel /tmp directory)
 function getWritableOutputDir() {
@@ -63,11 +64,13 @@ async function uploadAndParse(req, res, next) {
     // Generate unique file ID
     const fileId = `resume-${Date.now()}-${Math.round(Math.random() * 1E6)}`;
 
+    const safeData = sanitizeResumeData(parsedData);
+
     // Save output JSON to writable temp directory if possible
     try {
       const outputFolder = getWritableOutputDir();
       const outputPath = path.join(outputFolder, `${fileId}.json`);
-      fs.writeFileSync(outputPath, JSON.stringify(parsedData, null, 2), 'utf-8');
+      fs.writeFileSync(outputPath, JSON.stringify(safeData, null, 2), 'utf-8');
     } catch (err) {
       console.warn('Could not persist JSON file to disk (Serverless Read-Only), returning in response payload:', err.message);
     }
@@ -78,10 +81,9 @@ async function uploadAndParse(req, res, next) {
       fileId: fileId,
       metadata: {
         pages: pdfData.numpages,
-        info: pdfData.info,
         characterCount: rawText.length
       },
-      data: parsedData
+      data: safeData
     });
   } catch (error) {
     next(error);
@@ -93,7 +95,7 @@ async function uploadAndParse(req, res, next) {
  * Return sample structured resume JSON
  */
 function getSample(req, res) {
-  const sample = getSampleResume();
+  const sample = sanitizeResumeData(getSampleResume());
   return res.status(200).json({
     success: true,
     data: sample
@@ -108,7 +110,7 @@ function downloadJSON(req, res) {
   const fileId = req.params.id || req.query.id;
 
   if (!fileId) {
-    const sampleData = getSampleResume();
+    const sampleData = sanitizeResumeData(getSampleResume());
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', 'attachment; filename="sample_resume.json"');
     return res.send(JSON.stringify(sampleData, null, 2));
@@ -118,7 +120,7 @@ function downloadJSON(req, res) {
   const jsonFilePath = path.join(outputFolder, `${fileId}.json`);
 
   if (!fs.existsSync(jsonFilePath)) {
-    const sampleData = getSampleResume();
+    const sampleData = sanitizeResumeData(getSampleResume());
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', `attachment; filename="resume_${fileId}.json"`);
     return res.send(JSON.stringify(sampleData, null, 2));

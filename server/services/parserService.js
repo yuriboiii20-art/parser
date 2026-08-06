@@ -6,6 +6,7 @@
 const { normalizeText } = require('../utils/textUtils');
 const { detectSections } = require('./sectionDetector');
 const { parsePersonal } = require('../parsers/personal/personalParser');
+const { sanitizeResumeData } = require('../utils/privacy');
 const { parseSummary } = require('../parsers/summary/summaryParser');
 const { parseSkills } = require('../parsers/skills/skillsParser');
 const { parseExperience } = require('../parsers/experience/experienceParser');
@@ -32,7 +33,7 @@ function parseResumeText(rawText) {
   const certifications = parseCertifications(sections.CERTIFICATIONS);
   const achievements = parseAchievements(sections.ACHIEVEMENTS);
 
-  return {
+  const parsed = {
     name: personal.name || '',
     email: personal.email || '',
     phone: personal.phone || '',
@@ -55,6 +56,8 @@ function parseResumeText(rawText) {
     certifications: certifications || [],
     achievements: achievements || []
   };
+
+  return sanitizeResumeData(parsed);
 }
 
 /**
@@ -62,7 +65,7 @@ function parseResumeText(rawText) {
  * @returns {Object}
  */
 function getSampleResume() {
-  return {
+  const sample = {
     name: "Alex Mercer",
     email: "alex.mercer@example.com",
     phone: "+1 (555) 234-5678",
@@ -128,6 +131,8 @@ function getSampleResume() {
       "Published technical article on Node.js performance optimization (100k+ reads)"
     ]
   };
+
+  return sanitizeResumeData(sample);
 }
 
 module.exports = {

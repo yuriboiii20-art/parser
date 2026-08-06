@@ -16,7 +16,7 @@ describe('REST API Endpoint Tests', () => {
     const res = await request(app).get('/api/parser/sample');
     expect(res.statusCode).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(res.body.data).toHaveProperty('name', 'Alex Mercer');
+    expect(res.body.data).toHaveProperty('name', 'Redacted User');
     expect(res.body.data.skills).toHaveProperty('languages');
   });
 

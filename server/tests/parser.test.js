@@ -8,6 +8,7 @@ const { parseSkills } = require('../parsers/skills/skillsParser');
 const { parseEducation } = require('../parsers/education/educationParser');
 const { parseExperience } = require('../parsers/experience/experienceParser');
 const { identifySectionHeader, detectSections } = require('../services/sectionDetector');
+const { sanitizeResumeData } = require('../utils/privacy');
 
 describe('Resume Parser Core Engine Tests', () => {
 
@@ -121,8 +122,8 @@ New York, NY`;
       const rawText = `Alice Johnson\nalice@test.com\nSKILLS\nJavaScript, Docker`;
       const json = parseResumeText(rawText);
 
-      expect(json).toHaveProperty('name', 'Alice Johnson');
-      expect(json).toHaveProperty('email', 'alice@test.com');
+      expect(json).toHaveProperty('name', 'Redacted User');
+      expect(json).toHaveProperty('email', 'redacted@example.com');
       expect(json).toHaveProperty('skills');
       expect(json.skills).toHaveProperty('languages');
       expect(json).toHaveProperty('experience');
@@ -132,9 +133,31 @@ New York, NY`;
       expect(json).toHaveProperty('achievements');
     });
 
+    test('should redact personal details from parsed resume data', () => {
+      const payload = {
+        name: 'Jane Doe',
+        email: 'jane@example.com',
+        phone: '+1 555-1234',
+        linkedin: 'https://www.linkedin.com/in/jane',
+        github: 'https://github.com/jane',
+        location: 'San Francisco',
+        summary: 'Contact me at jane@example.com'
+      };
+
+      const redacted = sanitizeResumeData(payload);
+
+      expect(redacted.name).toBe('Redacted User');
+      expect(redacted.email).toBe('redacted@example.com');
+      expect(redacted.phone).toBe('[REDACTED]');
+      expect(redacted.linkedin).toBe('[REDACTED]');
+      expect(redacted.github).toBe('[REDACTED]');
+      expect(redacted.location).toBe('[REDACTED]');
+      expect(redacted.summary).toContain('redacted');
+    });
+
     test('sample resume function returns rich sample object', () => {
       const sample = getSampleResume();
-      expect(sample.name).toBe('Alex Mercer');
+      expect(sample.name).toBe('Redacted User');
       expect(sample.skills.languages).toContain('JavaScript');
     });
   });
