@@ -1,29 +1,14 @@
 /**
  * Multer Upload Middleware
- * Handles PDF file upload with disk storage, size limit, and mime type verification.
+ * Uses Memory Storage to work seamlessly across both local environments and read-only serverless platforms (e.g. Vercel).
  */
 
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 const config = require('../config/appConfig');
 
-// Ensure upload directory exists
-if (!fs.existsSync(config.uploadDir)) {
-  fs.mkdirSync(config.uploadDir, { recursive: true });
-}
-
-// Storage Configuration
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, config.uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `resume-${uniqueSuffix}${ext}`);
-  }
-});
+// Memory storage keeps buffer in RAM for pdf-parse (serverless compliant)
+const storage = multer.memoryStorage();
 
 // File Filter for PDF
 const fileFilter = (req, file, cb) => {

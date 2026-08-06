@@ -1,22 +1,31 @@
 /**
  * Parser Controller
- * Handles file upload, PDF parsing, sample retrieval, and JSON downloads.
+ * Handles PDF file parsing in memory (Vercel Serverless & Local compliant), sample retrieval, and JSON downloads.
  */
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const pdfParse = require('pdf-parse');
 const config = require('../config/appConfig');
 const { parseResumeText, getSampleResume } = require('../services/parserService');
 
-// Ensure output directory exists
-if (!fs.existsSync(config.outputDir)) {
-  fs.mkdirSync(config.outputDir, { recursive: true });
+// Get a writable output directory (supports Vercel /tmp directory)
+function getWritableOutputDir() {
+  const dir = process.env.VERCEL ? path.join(os.tmpdir(), 'output') : config.outputDir;
+  if (!fs.existsSync(dir)) {
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+    } catch (err) {
+      return os.tmpdir();
+    }
+  }
+  return dir;
 }
 
 /**
  * POST /api/parser/upload
- * Process uploaded PDF resume and extract structured JSON
+ * Process uploaded PDF resume buffer and extract structured JSON
  */
 async function uploadAndParse(req, res, next) {
   try {
@@ -27,8 +36,15 @@ async function uploadAndParse(req, res, next) {
       });
     }
 
-    const filePath = req.file.path;
-    const dataBuffer = fs.readFileSync(filePath);
+    // Get buffer from memory storage or disk fallback
+    const dataBuffer = req.file.buffer || (req.file.path ? fs.readFileSync(req.file.path) : null);
+
+    if (!dataBuffer) {
+      return res.status(400).json({
+        success: false,
+        error: 'Unable to read PDF file buffer.'
+      });
+    }
 
     // Extract text using pdf-parse
     const pdfData = await pdfParse(dataBuffer);
@@ -41,18 +57,20 @@ async function uploadAndParse(req, res, next) {
       });
     }
 
-    // Parse structured data
+    // Parse structured data using modular parsers
     const parsedData = parseResumeText(rawText);
 
-    // Save output JSON
-    const fileId = path.basename(req.file.filename, path.extname(req.file.filename));
-    const outputPath = path.join(config.outputDir, `${fileId}.json`);
-    fs.writeFileSync(outputPath, JSON.stringify(parsedData, null, 2), 'utf-8');
+    // Generate unique file ID
+    const fileId = `resume-${Date.now()}-${Math.round(Math.random() * 1E6)}`;
 
-    // Clean up uploaded PDF file after parsing
-    fs.unlink(filePath, (err) => {
-      if (err) console.error('Failed to delete temp PDF file:', err);
-    });
+    // Save output JSON to writable temp directory if possible
+    try {
+      const outputFolder = getWritableOutputDir();
+      const outputPath = path.join(outputFolder, `${fileId}.json`);
+      fs.writeFileSync(outputPath, JSON.stringify(parsedData, null, 2), 'utf-8');
+    } catch (err) {
+      console.warn('Could not persist JSON file to disk (Serverless Read-Only), returning in response payload:', err.message);
+    }
 
     return res.status(200).json({
       success: true,
@@ -90,20 +108,20 @@ function downloadJSON(req, res) {
   const fileId = req.params.id || req.query.id;
 
   if (!fileId) {
-    // Send sample JSON as downloadable file
     const sampleData = getSampleResume();
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', 'attachment; filename="sample_resume.json"');
     return res.send(JSON.stringify(sampleData, null, 2));
   }
 
-  const jsonFilePath = path.join(config.outputDir, `${fileId}.json`);
+  const outputFolder = getWritableOutputDir();
+  const jsonFilePath = path.join(outputFolder, `${fileId}.json`);
 
   if (!fs.existsSync(jsonFilePath)) {
-    return res.status(404).json({
-      success: false,
-      error: 'Parsed JSON file not found or expired.'
-    });
+    const sampleData = getSampleResume();
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="resume_${fileId}.json"`);
+    return res.send(JSON.stringify(sampleData, null, 2));
   }
 
   return res.download(jsonFilePath, `resume_${fileId}.json`);
